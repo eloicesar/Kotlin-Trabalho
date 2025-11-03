@@ -1,0 +1,474 @@
+# 🔧 TROUBLESHOOTING - Soluções Rápidas
+
+## ❌ Problemas Comuns e Soluções
+
+---
+
+## 🔴 ERRO: "Unresolved reference: room"
+
+### Sintoma:
+```
+Unresolved reference: room
+Cannot resolve symbol 'Room'
+```
+
+### Causas:
+- Gradle Sync não completou
+- Dependências não baixadas
+- Versão do Room incompatível
+
+### Solução:
+1. **File** → **Sync Project with Gradle Files**
+2. Aguarde o download (barra inferior do Android Studio)
+3. Se não resolver: **File** → **Invalidate Caches** → **Invalidate and Restart**
+4. Se ainda falhar: Verifique internet e proxy
+
+---
+
+## 🔴 ERRO: "kapt error"
+
+### Sintoma:
+```
+Execution failed for task ':app:kaptDebugKotlin'
+```
+
+### Causa:
+- Plugin kapt não configurado
+
+### Solução:
+Adicione no topo do `build.gradle.kts`:
+```kotlin
+plugins {
+    id("kotlin-kapt")
+}
+```
+
+---
+
+## 🔴 APP CRASHA ao Abrir
+
+### Sintoma:
+App fecha imediatamente após abrir
+
+### Causas Comuns:
+
+#### 1. Permissão INTERNET faltando
+
+**Solução:**
+No `AndroidManifest.xml`, adicione:
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+```
+
+#### 2. Tema incompatível
+
+**Solução:**
+No `AndroidManifest.xml`, verifique:
+```xml
+android:theme="@style/Theme.GameLib"
+```
+
+#### 3. Erro na criação do Database
+
+**Solução:**
+Veja o **Logcat** (View → Tool Windows → Logcat)
+Procure por "SQLite" ou "Room" nas mensagens de erro
+
+---
+
+## 🔴 API NÃO FUNCIONA
+
+### Sintoma:
+Busca não retorna nada ou dá erro
+
+### Diagnóstico:
+
+#### 1. Sem Internet
+
+**Solução:**
+- No emulador: WiFi pode estar desativado
+- Settings → Network & Internet → WiFi → ON
+- Teste abrir Chrome no emulador
+
+#### 2. Cleartext Traffic
+
+**Erro no Logcat:**
+```
+Cleartext HTTP traffic not permitted
+```
+
+**Solução:**
+No `AndroidManifest.xml`, adicione:
+```xml
+<application
+    android:usesCleartextTraffic="true"
+    ...>
+```
+
+#### 3. API Lenta/Indisponível
+
+**Solução:**
+- API pública pode estar lenta
+- Aguarde alguns segundos
+- Tente outro termo de busca
+- Verifique https://rawg.io/apidocs (status da API)
+
+#### 4. JSON Parse Error
+
+**Erro no Logcat:**
+```
+End of input at line 1 column 1 path $
+```
+
+**Causa:** API retornou HTML ao invés de JSON (erro 429 - rate limit)
+
+**Solução:**
+- Aguarde 1 minuto
+- Use menos requisições seguidas
+- Para produção: registrar e usar API key
+
+---
+
+## 🔴 COMPARTILHAMENTO NÃO FUNCIONA
+
+### Sintoma:
+Clica em compartilhar mas nada acontece
+
+### Causas:
+
+#### 1. Emulador sem apps
+
+**Solução:**
+- Emulador geralmente não tem WhatsApp
+- Instale Gmail no emulador:
+  - No emulador, abra Play Store
+  - Faça login
+  - Instale Gmail ou outro app
+
+#### 2. Intent não configurado
+
+**Solução:**
+Verifique se o código está assim:
+```kotlin
+val intent = Intent().apply {
+    action = Intent.ACTION_SEND
+    putExtra(Intent.EXTRA_TEXT, shareText)
+    type = "text/plain"
+}
+context.startActivity(Intent.createChooser(intent, "Compartilhar"))
+```
+
+#### 3. Melhor: Teste em dispositivo físico
+
+---
+
+## 🔴 TELA BRANCA / NADA APARECE
+
+### Sintoma:
+App abre mas fica em branco
+
+### Diagnóstico:
+
+#### 1. Compose Preview não renderiza
+
+**Não é problema!** Preview é opcional.
+
+**Para testar:** Execute no emulador
+
+#### 2. Navigation está quebrada
+
+**Solução:**
+Verifique se `AppNavigation()` está sendo chamado no `MainActivity`:
+```kotlin
+setContent {
+    GameLibTheme {
+        Surface(...) {
+            AppNavigation()  // ← ESTE
+        }
+    }
+}
+```
+
+#### 3. ViewModel não inicializa
+
+**Erro comum:** Esquecer de passar viewModel
+
+**Solução:**
+```kotlin
+val viewModel: GameViewModel = viewModel()
+```
+
+---
+
+## 🔴 DADOS NÃO PERSISTEM
+
+### Sintoma:
+Fecha e abre app, dados sumiram
+
+### Causas:
+
+#### 1. Emulador foi limpo
+
+**Solução:**
+- Normal. Emulador às vezes limpa dados
+- Re-adicione os dados
+- Ou use "Cold Boot" no emulador
+
+#### 2. Database não inicializa
+
+**Solução:**
+Verifique em `AppDatabase.kt`:
+```kotlin
+fun getDatabase(context: Context): AppDatabase {
+    return INSTANCE ?: synchronized(this) {
+        val instance = Room.databaseBuilder(
+            context.applicationContext,  // ← IMPORTANTE
+            AppDatabase::class.java,
+            "gamelib_database"
+        ).build()
+        INSTANCE = instance
+        instance
+    }
+}
+```
+
+#### 3. Queries assíncronas incorretas
+
+**Problema:** Usar `.value` ao invés de `collectAsState()`
+
+**Solução:**
+```kotlin
+val games by viewModel.allGames.collectAsState()  // ✅ CORRETO
+// val games = viewModel.allGames.value  // ❌ ERRADO
+```
+
+---
+
+## 🔴 BUILD FAILED / GRADLE SYNC ERROR
+
+### Sintoma:
+```
+BUILD FAILED in 10s
+Could not resolve...
+```
+
+### Soluções:
+
+#### 1. Limpar e Rebuild
+
+```
+Build → Clean Project
+Build → Rebuild Project
+```
+
+#### 2. Deletar cache do Gradle
+
+**No terminal do Android Studio:**
+```bash
+./gradlew clean
+./gradlew build
+```
+
+#### 3. Invalidar cache
+
+```
+File → Invalidate Caches → Invalidate and Restart
+```
+
+#### 4. Verificar versões
+
+No `build.gradle.kts`, use estas versões testadas:
+```kotlin
+compileSdk = 34
+minSdk = 24
+targetSdk = 34
+
+// Room
+implementation("androidx.room:room-runtime:2.6.0")
+kapt("androidx.room:room-compiler:2.6.0")
+
+// Compose
+implementation(platform("androidx.compose:compose-bom:2023.10.01"))
+```
+
+---
+
+## 🔴 ERROS DE IMPORTAÇÃO
+
+### Sintoma:
+```
+Unresolved reference: Game
+Unresolved reference: GameDao
+```
+
+### Causa:
+Package path incorreto
+
+### Solução:
+
+Verifique se todos os arquivos começam com:
+```kotlin
+package com.example.gamelib.[resto.do.caminho]
+```
+
+Estrutura deve ser:
+```
+com.example.gamelib
+├── MainActivity.kt
+├── data.local.entity.Game
+├── data.local.entity.Review
+├── data.local.dao.GameDao
+etc...
+```
+
+---
+
+## 🔴 EMULADOR LENTO
+
+### Sintoma:
+App demora muito para abrir/responder
+
+### Soluções:
+
+#### 1. Habilitar aceleração
+
+**AVD Manager → Edit → Show Advanced Settings**
+- Graphics: **Hardware - GLES 2.0**
+- Boot option: **Cold boot**
+
+#### 2. Aumentar RAM
+
+- RAM: mínimo 2048 MB
+- VM heap: 512 MB
+
+#### 3. Usar dispositivo físico
+
+- Mais rápido
+- Testes mais realistas
+- Recomendado para apresentação
+
+---
+
+## 🔴 LOGCAT NÃO MOSTRA NADA
+
+### Sintoma:
+Logcat vazio ou não atualiza
+
+### Solução:
+
+1. **View** → **Tool Windows** → **Logcat**
+2. Filtro: Selecione o dispositivo no dropdown
+3. Level: **Debug** ou **Verbose**
+4. Filter: `package:com.example.gamelib`
+
+---
+
+## 🔴 COMPOSE PREVIEW NÃO FUNCIONA
+
+### Sintoma:
+Preview fica carregando ou dá erro
+
+### Solução:
+
+**NÃO É CRÍTICO!** Preview é só para desenvolvimento.
+
+Se quiser corrigir:
+1. **Build** → **Rebuild Project**
+2. Feche e reabra o arquivo
+3. Clique em "Refresh" no painel de preview
+
+**Alternativa:** Sempre teste no emulador, preview não é obrigatório.
+
+---
+
+## 🟢 CHECKLIST DE FUNCIONAMENTO
+
+### Antes de Apresentar, Verifique:
+
+- [ ] App compila sem erros (**Build → Make Project**)
+- [ ] Emulador abre o app
+- [ ] Consegue adicionar um jogo
+- [ ] Consegue ver a lista de jogos
+- [ ] Consegue editar um jogo
+- [ ] Consegue deletar um jogo
+- [ ] Consegue adicionar avaliação
+- [ ] Consegue deletar avaliação
+- [ ] API funciona (busca retorna resultados)
+- [ ] Compartilhamento abre o chooser
+- [ ] Fechar e reabrir mantém dados
+
+### Se TODOS os itens acima funcionam:
+
+**✅ VOCÊ ESTÁ PRONTO PARA APRESENTAR!**
+
+---
+
+## 📱 CONFIGURAÇÃO IDEAL PARA APRESENTAÇÃO
+
+### Emulador Recomendado:
+
+- **Device:** Pixel 6
+- **System Image:** API 34 (Android 14)
+- **RAM:** 2048 MB
+- **Graphics:** Hardware - GLES 2.0
+
+### Configurações do PC:
+
+- **Internet:** Conectado (para API)
+- **Antivírus:** Pausado (se estiver lento)
+- **Outros apps:** Fechados (economizar RAM)
+
+---
+
+## 🆘 PLANO B - DIA DA APRESENTAÇÃO
+
+### Se o app crashar na hora:
+
+1. **Mantenha a calma**
+2. Mostre o código e explique:
+   - "Aqui está o Room configurado..."
+   - "Este é o CRUD implementado..."
+   - "A API consome este endpoint..."
+3. Mostre prints/vídeos funcionando (se tiver)
+4. Explique a arquitetura no código
+
+### Se o emulador não iniciar:
+
+1. Tente dispositivo físico
+2. Ou cole o projeto e compile na máquina da sala
+3. Worst case: Apresente o código e explique
+
+### Se tudo falhar:
+
+- Você CONSTRUIU o projeto
+- Você ENTENDE o código
+- Isso também conta!
+- Professores sabem que tecnologia falha
+
+---
+
+## 💡 CONTATO DE EMERGÊNCIA
+
+Se encontrar um erro que não está aqui:
+
+1. **Copie a mensagem completa do erro**
+2. **Verifique o Logcat** (mensagens em vermelho)
+3. **Google:** "android [mensagem-do-erro]"
+4. **Stack Overflow** geralmente tem a resposta
+
+---
+
+## ✅ TUDO FUNCIONANDO?
+
+**Então relaxe e se prepare para uma ótima apresentação!**
+
+---
+
+**Última revisão antes de apresentar:**
+- [ ] App abre
+- [ ] Dados aparecem
+- [ ] API responde
+- [ ] Compartilhamento funciona
+- [ ] Você está confiante
+
+**Você consegue! 🚀**
